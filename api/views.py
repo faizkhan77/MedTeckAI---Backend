@@ -7,6 +7,7 @@ from .serializers import (
     PatientMedicalInfoSerializer,
     DoctorProfileSerializer,
     MedicalImageSerializer,
+    UserSerializer,
 )
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
@@ -16,6 +17,7 @@ from rest_framework import status
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
+from rest_framework import viewsets, permissions
 
 
 @api_view(["GET"])
@@ -68,6 +70,15 @@ class MedicalImageListView(generics.ListCreateAPIView):
 class MedicalImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = MedicalImage.objects.all()
     serializer_class = MedicalImageSerializer
+
+
+# ✅ User ViewSet (Handles User & Profile)
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    """Handles listing and retrieving users (Read-Only)"""
+
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    # permission_classes = [permissions.IsAuthenticated]
 
 
 @api_view(["POST"])

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("", views.getRoutes, name="get_routes"),
@@ -32,4 +33,6 @@ urlpatterns = [
     ),
     path("login/", views.login_view, name="login"),
     path("signup/", views.signup_view, name="signup"),
+    # 🔥 Add the token refresh endpoint here
+    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]
