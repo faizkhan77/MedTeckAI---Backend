@@ -12,7 +12,7 @@ class User(AbstractUser):
 
 # Patient Profile Model
 class PatientProfile(models.Model):
-    user = models.ForeignKey("api.User", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)
@@ -76,7 +76,7 @@ class PatientMedicalInfo(models.Model):
 
 # Doctor Profile Model
 class DoctorProfile(models.Model):
-    user = models.ForeignKey("api.User", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
 
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)

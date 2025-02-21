@@ -17,18 +17,12 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_profile(self, obj):
         if obj.role == "patient":
-            patient_profile = PatientProfile.objects.filter(user=obj).first()
-            return (
-                PatientProfileSerializer(patient_profile).data
-                if patient_profile
-                else None
-            )
+            profile = PatientProfile.objects.filter(user=obj).first()
         elif obj.role == "doctor":
-            doctor_profile = DoctorProfile.objects.filter(user=obj).first()
-            return (
-                DoctorProfileSerializer(doctor_profile).data if doctor_profile else None
-            )
-        return None
+            profile = DoctorProfile.objects.filter(user=obj).first()
+        else:
+            profile = None
+        return profile.id if profile else None
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
