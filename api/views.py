@@ -26,56 +26,78 @@ from rest_framework import viewsets, permissions
 from django.contrib.auth import get_user_model
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+
 @api_view(["GET"])
 def getRoutes(request):
     routes = [
+        {"GET": "/api/users/"},
+        {"GET": "/api/users/<id>/"},
         {"GET": "/api/patients/"},
+        {"POST": "/api/patients/"},
         {"GET": "/api/patients/<id>/"},
-        {"GET": "/api/patients/<id>/medical-info/"},
+        {"PUT": "/api/patients/<id>/"},
+        {"PATCH": "/api/patients/<id>/"},
+        {"DELETE": "/api/patients/<id>/"},
+        {"GET": "/api/medical-info/"},
+        {"POST": "/api/medical-info/"},
+        {"GET": "/api/medical-info/<id>/"},
+        {"PUT": "/api/medical-info/<id>/"},
+        {"PATCH": "/api/medical-info/<id>/"},
+        {"DELETE": "/api/medical-info/<id>/"},
         {"GET": "/api/doctors/"},
+        {"POST": "/api/doctors/"},
         {"GET": "/api/doctors/<id>/"},
+        {"PUT": "/api/doctors/<id>/"},
+        {"PATCH": "/api/doctors/<id>/"},
+        {"DELETE": "/api/doctors/<id>/"},
         {"GET": "/api/medical-images/"},
+        {"POST": "/api/medical-images/"},
         {"GET": "/api/medical-images/<id>/"},
+        {"PUT": "/api/medical-images/<id>/"},
+        {"PATCH": "/api/medical-images/<id>/"},
+        {"DELETE": "/api/medical-images/<id>/"},
+        {"POST": "/api/login/"},
+        {"POST": "/api/signup/"},
+        {"POST": "/api/token/refresh/"},
     ]
     return Response(routes)
 
 
 # Patient Views
-class PatientProfileListView(generics.ListCreateAPIView):
+class PatientProfileViewSet(viewsets.ModelViewSet):
+    """Handles CRUD for Patient Profiles"""
+
     queryset = PatientProfile.objects.all()
     serializer_class = PatientProfileSerializer
 
 
-class PatientProfileDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = PatientProfile.objects.all()
-    serializer_class = PatientProfileSerializer
+class PatientMedicalInfoViewSet(viewsets.ModelViewSet):
+    """Handles CRUD for Patient Medical Info"""
 
-
-class PatientMedicalInfoDetailView(generics.RetrieveUpdateAPIView):
     queryset = PatientMedicalInfo.objects.all()
     serializer_class = PatientMedicalInfoSerializer
 
 
 # Doctor Views
-class DoctorProfileListView(generics.ListCreateAPIView):
-    queryset = DoctorProfile.objects.all()
-    serializer_class = DoctorProfileSerializer
+class DoctorProfileViewSet(viewsets.ModelViewSet):
+    """Handles CRUD for Doctor Profiles"""
 
-
-class DoctorProfileDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = DoctorProfile.objects.all()
     serializer_class = DoctorProfileSerializer
 
 
 # Medical Image Views
-class MedicalImageListView(generics.ListCreateAPIView):
+class MedicalImageViewSet(viewsets.ModelViewSet):
+    """Handles CRUD for Medical Images"""
+
     queryset = MedicalImage.objects.all()
     serializer_class = MedicalImageSerializer
 
 
-class MedicalImageDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = MedicalImage.objects.all()
-    serializer_class = MedicalImageSerializer
+User = get_user_model()
 
 
 # ✅ User ViewSet (Handles User & Profile)
@@ -87,9 +109,6 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
 
 
-User = get_user_model()
-
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def signup_view(request):
@@ -97,7 +116,7 @@ def signup_view(request):
     if role not in ["doctor", "patient"]:
         return Response(
             {"error": "Invalid role. Must be 'doctor' or 'patient'."},
-            status=status.HTTP_400_BAD_REQUEST,
+            status=400,
         )
 
     serializer = UserSerializer(data=request.data)
@@ -109,18 +128,17 @@ def signup_view(request):
             role=role,
         )
 
-        # Create profile based on role
         if role == "patient":
             PatientProfile.objects.create(user=user)
         elif role == "doctor":
             DoctorProfile.objects.create(user=user)
 
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(UserSerializer(user).data, status=201)
+    return Response(serializer.errors, status=400)
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])  # Allows access without authentication
+@permission_classes([AllowAny])
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
