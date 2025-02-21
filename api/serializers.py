@@ -50,8 +50,6 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class MedicalImageSerializer(serializers.ModelSerializer):
-    patient = PatientProfileSerializer(read_only=True)
-
     class Meta:
         model = MedicalImage
-        fields = "__all__"
+        fields = ["id", "patient", "image", "image_type", "uploaded_at", "result"]

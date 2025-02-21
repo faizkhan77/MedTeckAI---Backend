@@ -158,3 +158,54 @@ def login_view(request):
             }
         )
     return Response({"error": "Invalid Credentials"}, status=400)
+
+
+from ultralytics import YOLO
+from django.core.files.storage import default_storage
+import os
+from django.core.files.base import ContentFile
+
+# Load the YOLOv11 model
+model = YOLO("best.pt")
+
+
+class MedicalImageViewSet(viewsets.ModelViewSet):
+    queryset = MedicalImage.objects.all()
+    serializer_class = MedicalImageSerializer
+
+    @action(detail=False, methods=["post"])
+    def detect_image(self, request):
+        """Handles image upload and runs YOLO detection."""
+        if "image" not in request.FILES:
+            return Response(
+                {"error": "No image uploaded"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        image_file = request.FILES["image"]
+        image_type = request.data.get("image_type", "Unknown")
+
+        # Save the uploaded image
+        image_path = default_storage.save(
+            f"medical_images/{image_file.name}", ContentFile(image_file.read())
+        )
+
+        # Run YOLO detection
+        prediction = model.predict(
+            source=os.path.join(default_storage.location, image_path), save=True
+        )
+        output_dir = prediction[0].save_dir  # Directory where YOLO saves the result
+
+        # Find processed image
+        processed_image_path = os.path.join(output_dir, image_file.name)
+
+        return Response(
+            {
+                "original_image": request.build_absolute_uri(
+                    default_storage.url(image_path)
+                ),
+                "processed_image": request.build_absolute_uri(
+                    default_storage.url(processed_image_path)
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -16,6 +16,7 @@ router.register(
 router.register(r"doctors", views.DoctorProfileViewSet, basename="doctor")
 router.register(r"medical-images", views.MedicalImageViewSet, basename="medical-image")
 
+
 # ✅ Include router-generated URLs
 urlpatterns = [
     path("api-auth/", include("rest_framework.urls")),  # Enables Login UI
