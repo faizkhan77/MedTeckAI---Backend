@@ -1,10 +1,19 @@
 from django.db import models
-from django.contrib.auth.models import AbstractUser, User
+from django.contrib.auth.models import AbstractUser
+
+
+class User(AbstractUser):
+    ROLE_CHOICES = (
+        ("doctor", "Doctor"),
+        ("patient", "Patient"),
+    )
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES)
 
 
 # Patient Profile Model
 class PatientProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.ForeignKey("api.User", on_delete=models.CASCADE)
+
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)
     age = models.PositiveIntegerField()
@@ -67,7 +76,8 @@ class PatientMedicalInfo(models.Model):
 
 # Doctor Profile Model
 class DoctorProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.ForeignKey("api.User", on_delete=models.CASCADE)
+
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)
     specialization = models.CharField(max_length=100)

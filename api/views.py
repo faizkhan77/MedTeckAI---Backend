@@ -1,7 +1,13 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import generics
-from .models import PatientProfile, PatientMedicalInfo, DoctorProfile, MedicalImage
+from .models import (
+    PatientProfile,
+    PatientMedicalInfo,
+    DoctorProfile,
+    MedicalImage,
+    User,
+)
 from .serializers import (
     PatientProfileSerializer,
     PatientMedicalInfoSerializer,
@@ -9,7 +15,6 @@ from .serializers import (
     MedicalImageSerializer,
     UserSerializer,
 )
-from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -18,6 +23,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
 from rest_framework import viewsets, permissions
+from django.contrib.auth import get_user_model
 
 
 @api_view(["GET"])
@@ -81,36 +87,36 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     # permission_classes = [permissions.IsAuthenticated]
 
 
+User = get_user_model()
+
+
 @api_view(["POST"])
-@permission_classes([AllowAny])  # Allows access without authentication
+@permission_classes([AllowAny])
 def signup_view(request):
-    username = request.data.get("username")
-    # email = request.data.get("email")
-    password = request.data.get("password")
-    confirm_password = request.data.get("confirm_password")
+    role = request.data.get("role")
+    if role not in ["doctor", "patient"]:
+        return Response(
+            {"error": "Invalid role. Must be 'doctor' or 'patient'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    if password != confirm_password:
-        return Response({"error": "Passwords do not match"}, status=400)
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+        user = User.objects.create_user(
+            username=serializer.validated_data["username"],
+            email=serializer.validated_data["email"],
+            password=request.data.get("password"),
+            role=role,
+        )
 
-    if User.objects.filter(username=username).exists():
-        return Response({"error": "Username already taken"}, status=400)
+        # Create profile based on role
+        if role == "patient":
+            PatientProfile.objects.create(user=user)
+        elif role == "doctor":
+            DoctorProfile.objects.create(user=user)
 
-    user = User.objects.create_user(username=username, password=password)
-    user.save()
-
-    # Automatically log in the user after signup
-    refresh = RefreshToken.for_user(user)
-    return Response(
-        {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-            },
-        }
-    )
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(["POST"])
