@@ -34,7 +34,10 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
 
 class PatientMedicalInfoSerializer(serializers.ModelSerializer):
-    patient = PatientProfileSerializer(read_only=True)
+    # patient = PatientProfileSerializer(read_only=True)
+    patient = serializers.PrimaryKeyRelatedField(
+        queryset=PatientProfile.objects.all()
+    )  # ✅ Allow patient ID in request
 
     class Meta:
         model = PatientMedicalInfo

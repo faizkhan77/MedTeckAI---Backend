@@ -79,6 +79,11 @@ class PatientMedicalInfoViewSet(viewsets.ModelViewSet):
 
     queryset = PatientMedicalInfo.objects.all()
     serializer_class = PatientMedicalInfoSerializer
+    
+    def perform_create(self, serializer):
+        """Automatically assign the authenticated user’s patient profile"""
+        patient_profile = PatientProfile.objects.get(user=self.request.user)  # Get the PatientProfile
+        serializer.save(patient=patient_profile)  # Assign the patient field
 
 
 # Doctor Views
