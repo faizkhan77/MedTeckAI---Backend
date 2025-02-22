@@ -25,14 +25,6 @@ class UserSerializer(serializers.ModelSerializer):
         return profile.id if profile else None
 
 
-class PatientProfileSerializer(serializers.ModelSerializer):
-    # user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = PatientProfile
-        fields = "__all__"
-
-
 class PatientMedicalInfoSerializer(serializers.ModelSerializer):
     # patient = PatientProfileSerializer(read_only=True)
     patient = serializers.PrimaryKeyRelatedField(
@@ -44,17 +36,35 @@ class PatientMedicalInfoSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class MedicalImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalImage
+        fields = ["id", "patient", "image", "image_type", "uploaded_at", "result"]
+
+
+class PatientProfileSerializer(serializers.ModelSerializer):
+    medical_info = PatientMedicalInfoSerializer(read_only=True)
+    medical_images = MedicalImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PatientProfile
+        fields = [
+            "id",
+            "user",
+            "firstname",
+            "lastname",
+            "age",
+            "gender",
+            "contact_number",
+            "email",
+            "medical_info",
+            "medical_images",
+        ]
+
+
 class DoctorProfileSerializer(serializers.ModelSerializer):
     # user = UserSerializer(read_only=True)
 
     class Meta:
         model = DoctorProfile
-        fields = "__all__"
-
-
-class MedicalImageSerializer(serializers.ModelSerializer):
-    patient = PatientProfileSerializer(read_only=True)
-
-    class Meta:
-        model = MedicalImage
         fields = "__all__"
