@@ -24,6 +24,7 @@ urlpatterns = [
     path(
         "", include(router.urls)
     ),  # Automatically includes all CRUD routes from the router
+    path("recommend-doctors/", views.recommend_doctors, name="recommend-teams"),
     path("login/", views.login_view, name="login"),
     path("signup/", views.signup_view, name="signup"),
     path(

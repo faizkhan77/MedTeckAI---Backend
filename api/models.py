@@ -12,7 +12,7 @@ class User(AbstractUser):
 
 # Patient Profile Model
 class PatientProfile(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.OneToOneField("api.User", on_delete=models.CASCADE)
 
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)
@@ -76,10 +76,11 @@ class PatientMedicalInfo(models.Model):
 
 # Doctor Profile Model
 class DoctorProfile(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.OneToOneField("api.User", on_delete=models.CASCADE)
 
     firstname = models.CharField(max_length=150)
     lastname = models.CharField(max_length=150)
+    bio = models.TextField(blank=True, null=True)
     specialization = models.CharField(max_length=100)
     experience_years = models.PositiveIntegerField()
     certifications = models.ImageField(
@@ -103,7 +104,9 @@ class DoctorProfile(models.Model):
 
 
 class MedicalImage(models.Model):
-    patient = models.ForeignKey(PatientProfile, on_delete=models.CASCADE)
+    patient = models.ForeignKey(
+        PatientProfile, on_delete=models.CASCADE, related_name="medicalimages"
+    )
     image = models.ImageField(upload_to="medical_images/")
     image_type = models.CharField(
         max_length=50, choices=[("MRI", "MRI"), ("X-Ray", "X-Ray")]

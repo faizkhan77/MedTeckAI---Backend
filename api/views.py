@@ -79,10 +79,12 @@ class PatientMedicalInfoViewSet(viewsets.ModelViewSet):
 
     queryset = PatientMedicalInfo.objects.all()
     serializer_class = PatientMedicalInfoSerializer
-    
+
     def perform_create(self, serializer):
         """Automatically assign the authenticated user’s patient profile"""
-        patient_profile = PatientProfile.objects.get(user=self.request.user)  # Get the PatientProfile
+        patient_profile = PatientProfile.objects.get(
+            user=self.request.user
+        )  # Get the PatientProfile
         serializer.save(patient=patient_profile)  # Assign the patient field
 
 
@@ -169,9 +171,15 @@ from ultralytics import YOLO
 from django.core.files.storage import default_storage
 import os
 from django.core.files.base import ContentFile
+import google.generativeai as genai  # Correct way to import
+from django.conf import settings
+import shutil
 
 # Load the YOLOv11 model
 model = YOLO("best.pt")
+
+
+import glob
 
 
 class MedicalImageViewSet(viewsets.ModelViewSet):
@@ -180,7 +188,7 @@ class MedicalImageViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"])
     def detect_image(self, request):
-        """Handles image upload and runs YOLO detection."""
+        """Handles image upload, runs YOLO detection, saves results in the database, and returns detected label."""
         if "image" not in request.FILES:
             return Response(
                 {"error": "No image uploaded"}, status=status.HTTP_400_BAD_REQUEST
@@ -188,20 +196,64 @@ class MedicalImageViewSet(viewsets.ModelViewSet):
 
         image_file = request.FILES["image"]
         image_type = request.data.get("image_type", "Unknown")
+        patient_id = request.data.get("patient_id")
 
-        # Save the uploaded image
+        try:
+            patient = PatientProfile.objects.get(id=patient_id)
+        except PatientProfile.DoesNotExist:
+            return Response(
+                {"error": "Invalid patient ID"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Save uploaded image
         image_path = default_storage.save(
             f"medical_images/{image_file.name}", ContentFile(image_file.read())
         )
+        image_full_path = os.path.join(settings.MEDIA_ROOT, image_path)
 
         # Run YOLO detection
-        prediction = model.predict(
-            source=os.path.join(default_storage.location, image_path), save=True
-        )
-        output_dir = prediction[0].save_dir  # Directory where YOLO saves the result
+        prediction = model.predict(source=image_full_path, save=True)
+        output_dir = prediction[0].save_dir  # YOLO output directory
 
-        # Find processed image
-        processed_image_path = os.path.join(output_dir, image_file.name)
+        # Extract detected label (tumor type)
+        detected_tumors = []
+        for result in prediction:
+            for box in result.boxes:
+                tumor_label = result.names[int(box.cls)]  # Extract class label
+                detected_tumors.append(tumor_label)
+
+        if not detected_tumors:
+            return Response({"error": "No tumor detected"}, status=status.HTTP_200_OK)
+
+        tumor_type = detected_tumors[0]  # Assuming the first detected tumor is primary
+
+        # Find the processed image in output_dir
+        processed_images = glob.glob(os.path.join(output_dir, "*"))
+        processed_images = [
+            img for img in processed_images if img.endswith((".jpg", ".png"))
+        ]
+
+        if not processed_images:
+            return Response(
+                {"error": "Processed image not found"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        processed_image_path = processed_images[0]  # Get the first detected image
+        processed_filename = os.path.basename(processed_image_path)
+
+        # Copy processed image to media folder
+        processed_image_dest = os.path.join(
+            settings.MEDIA_ROOT, "medical_images", processed_filename
+        )
+        shutil.copy(processed_image_path, processed_image_dest)
+
+        # Save record in MedicalImage model
+        medical_image = MedicalImage.objects.create(
+            patient=patient,
+            image=f"medical_images/{processed_filename}",
+            image_type=image_type,
+        )
 
         return Response(
             {
@@ -209,8 +261,77 @@ class MedicalImageViewSet(viewsets.ModelViewSet):
                     default_storage.url(image_path)
                 ),
                 "processed_image": request.build_absolute_uri(
-                    default_storage.url(processed_image_path)
+                    settings.MEDIA_URL + f"medical_images/{processed_filename}"
                 ),
+                "image_id": medical_image.id,
+                "tumor_type": tumor_type,  # ✅ Only returning the detected tumor type
             },
             status=status.HTTP_200_OK,
         )
+
+
+from django.http import JsonResponse
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def recommend_doctors(request):
+    """API endpoint to recommend doctors based on patient profile."""
+    user = request.user
+    if not user.is_authenticated:
+        return JsonResponse({"error": "User is not authenticated"}, status=401)
+
+    try:
+        patient_profile = PatientProfile.objects.get(user=user)
+        medical_info = patient_profile.medical_info
+    except PatientProfile.DoesNotExist:
+        return JsonResponse({"error": "Patient profile not found"}, status=404)
+    except AttributeError:
+        return JsonResponse({"error": "Medical information not found"}, status=404)
+
+    # Combine patient medical info fields into one string
+    patient_data = " ".join(
+        filter(
+            None,
+            [
+                medical_info.allergies,
+                medical_info.current_medications,
+                medical_info.history_of_disease,
+                medical_info.medical_history,
+                medical_info.existing_medical_conditions,
+                medical_info.past_surgeries,
+                medical_info.genetic_disorders,
+            ],
+        )
+    ).lower()
+
+    # Fetch all doctors
+    doctors = DoctorProfile.objects.all()
+    if not doctors.exists():
+        return JsonResponse({"error": "No doctors found"}, status=404)
+
+    # Prepare doctor data
+    doctor_data = [
+        " ".join(filter(None, [doctor.specialization, doctor.bio])).lower()
+        for doctor in doctors
+    ]
+
+    # Vectorizing patient data and doctor data using TF-IDF
+    vectorizer = TfidfVectorizer()
+    vectors = vectorizer.fit_transform([patient_data] + doctor_data)
+
+    # Compute cosine similarity between patient profile and all doctors
+    similarities = cosine_similarity(vectors[0], vectors[1:]).flatten()
+
+    # Sort doctors based on similarity scores
+    doctor_scores = list(zip(doctors, similarities))
+    doctor_scores.sort(key=lambda x: x[1], reverse=True)
+
+    # Serialize top 5 recommended doctors
+    recommended_doctors = DoctorProfileSerializer(
+        [doctor for doctor, score in doctor_scores[:5] if score > 0], many=True
+    ).data
+
+    return JsonResponse({"recommended_doctors": recommended_doctors})
